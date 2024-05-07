@@ -1,0 +1,23 @@
+def REGISTRY = ''
+pipeline {
+    agent {
+	}
+
+	options {
+
+	}
+
+    stages {
+        stage('build') {
+            steps {
+            }
+        }
+        stage("push") {
+            steps {
+                script {
+                    }
+                }
+            }
+        }
+    }
+}

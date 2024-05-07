@@ -1,0 +1,7 @@
+site_name: Onboarding Demo App template
+site_description: This template is used to onboard a Demo App
+docs_dir: docs
+nav:
+  - "index.md"
+plugins:
+  - techdocs-core

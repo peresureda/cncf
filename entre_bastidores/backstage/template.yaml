@@ -1,0 +1,173 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: onboarding-demo-app
+  title: Onboarding Demo App
+  description: This template is used to onboard a Demo App
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - onboarding
+    - platform-engineering
+spec:
+  # El owner debe existir en Backstage
+  owner: team-platform-engineering
+  type: service
+  lifecycle: experimental
+  parameters:
+    - title: 🚀 Demo App Onboarding
+      required:
+        - app
+        - domain
+        - database
+      properties:
+        app:
+          title: Application Name
+          description: Application Name to publish.
+          type: string
+          pattern: "^[a-z0-9.-]{1,200}$"
+          ui:placeholder: 'myapp'
+        domain:
+          title: Domain
+          description: Type of App
+          type: string
+          enum:
+            - java
+          enumNames:
+            - 'Java Demo APP'
+        database:
+          title: database
+          type: string
+          description: Type of Database
+          enum:
+            - postgresql
+            - none
+          enumNames:
+            - 'Aurora postgresql Database'
+            - 'No Database'
+    - title: 🏗️ Application location
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - bitbucket.demo.org
+            allowedProjects:
+              - Platform
+            requestUserCredentials:
+              secretsKey: USER_OAUTH_TOKEN
+
+  steps:
+    # Onboard Java App
+    - id: fetch-base1
+      name: Fetch Java App
+      action: fetch:template
+      input:
+        url: ./content/java_initializer
+        values:
+          app: ${{ parameters.app }}
+          system: ${{ parameters.system | parseEntityRef | pick('name') }}
+          description: ${{ parameters.description }}
+          backstageUrl: 'https://backstage.local'
+
+    - id: publish
+      name: Create Repo App
+      action: bitbucketServer:repo:push
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        token: ${{ secrets.USER_OAUTH_TOKEN }}
+        description: ${{ parameters.description }}
+        defaultBranch: main
+        protectedBranches:
+          - pattern: main
+            restrictions:
+              - type: pull-request-only
+              - type: no-deletes
+        webhooks:
+          - name: Jenkins
+            url: https://jenkins_url.org
+            active: true
+            secret: test
+            events:
+              - repo:refs_changed
+              - pr:opened
+              - pr:from_ref_updated
+              - pr:merged
+              - pr:declined
+              - pr:deleted
+        pullRequestConfig:
+          requiredApprovals: 1
+          requiredSuccessfulBuilds: 1
+          requireAllTasksComplete: true
+          requireAllApprovals: false
+          unapproveOnUpdate: true
+          preventMergeIfNeedsWorkStatus: true
+          defaultMergeStrategy: ff
+          enabledMergeStrategies:
+            - ff
+            - no-ff
+            - squash
+        gitAuthorName: ${{ user.entity.metadata.name }}
+        gitAuthorEmail: ${{ user.entity.spec.profile.email }}
+        gitCommitMessage: Init '${{ parameters.app }}' from template standalone docker.
+
+    # Register on catalog
+    - id: catalog
+      name: Register to Catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        optional: true
+
+    # Onboard harbor project --> Custom Action
+    - action: harbor:project:add
+      id: create-harbor-project
+      name: Create Harbor project
+      input:
+        domainName: platform-tools
+        projectName: ${{ parameters.app }}
+        jiraIssue: CDDP-1000
+
+    # Onboard Chart App
+    - id: fetch-base2
+      name: Fetch Chart App
+      action: fetch:template
+      input:
+        url: ./content/chart
+        values:
+          app: ${{ parameters.app }}
+
+    # Custom Action Generate PR in Dev
+    - action: github:project:publish
+      id: deploy-chart
+      name: Publish Chart to Deploy App
+      input:
+        Url: GitHub URL
+        dir: argo cd project
+
+    # Create Database App
+    - id: fetch-base3
+      name: Fetch Infra Compositions
+      action: fetch:template
+      input:
+        url: ./content/postgresql
+        values:
+          app: ${{ parameters.app }}
+
+    - action: github:project:publish
+      id: deploy-infra
+      name: Create Database
+      if: ${{ parameters.database === 'postgresql' }}
+      input:
+        url: GitHub Argo URL
+        dir: argocd infra project
+
+  output:
+    links:
+      - title: View Pull Request for onboarding ${{ parameters.app }} on argo project
+        icon: scaffolder
+        url: ${{ steps['create-harbor-project'].output.remoteUrl }}

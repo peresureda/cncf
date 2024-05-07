@@ -1,0 +1,16 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.app }}
+  title: Demo ${{ values.app | title }} Docker
+  description: Demo ${{ values.app | title }} Docker
+  tags:
+    - platform
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  system: service
+  owner: demo
+  createdBy:
+    - template:default/demo

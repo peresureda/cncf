@@ -1,0 +1,5 @@
+branches:
+  - main
+ci: true
+# For all plugins see https://semantic-release.gitbook.io/semantic-release/extending/plugins-list
+plugins:
